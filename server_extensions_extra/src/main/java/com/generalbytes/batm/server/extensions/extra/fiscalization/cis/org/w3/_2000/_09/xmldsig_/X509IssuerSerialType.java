@@ -2,10 +2,7 @@
 package com.generalbytes.batm.server.extensions.extra.fiscalization.cis.org.w3._2000._09.xmldsig_;
 
 import java.math.BigInteger;
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlType;
+import javax.xml.bind.annotation.*;
 
 
 /**
@@ -28,6 +25,7 @@ import javax.xml.bind.annotation.XmlType;
  *
  *
  */
+@XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "X509IssuerSerialType", propOrder = {
     "x509IssuerName",
@@ -38,7 +36,7 @@ public class X509IssuerSerialType {
     @XmlElement(name = "X509IssuerName", required = true)
     protected String x509IssuerName;
     @XmlElement(name = "X509SerialNumber", required = true)
-    protected BigInteger x509SerialNumber;
+    protected String x509SerialNumber;
 
     /**
      * Gets the value of the x509IssuerName property.
@@ -72,7 +70,7 @@ public class X509IssuerSerialType {
      *     {@link BigInteger }
      *
      */
-    public BigInteger getX509SerialNumber() {
+    public String getX509SerialNumber() {
         return x509SerialNumber;
     }
 
@@ -84,7 +82,7 @@ public class X509IssuerSerialType {
      *     {@link BigInteger }
      *
      */
-    public void setX509SerialNumber(BigInteger value) {
+    public void setX509SerialNumber(String value) {
         this.x509SerialNumber = value;
     }
 

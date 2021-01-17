@@ -15,7 +15,7 @@ import javax.xml.ws.Service;
  *
  */
 @WebServiceClient(name = "FiskalizacijaService",
-                  wsdlLocation = "file:./FiskalizacijaService.wsdl",
+                  wsdlLocation = "classpath:wsdl/FiskalizacijaService.wsdl",
                   targetNamespace = "http://www.apis-it.hr/fin/2012/services/FiskalizacijaService")
 public class FiskalizacijaService extends Service {
 
@@ -24,15 +24,7 @@ public class FiskalizacijaService extends Service {
     public final static QName SERVICE = new QName("http://www.apis-it.hr/fin/2012/services/FiskalizacijaService", "FiskalizacijaService");
     public final static QName FiskalizacijaPortType = new QName("http://www.apis-it.hr/fin/2012/services/FiskalizacijaService", "FiskalizacijaPortType");
     static {
-        URL url = null;
-        try {
-            url = new URL("file:./FiskalizacijaService.wsdl");
-        } catch (MalformedURLException e) {
-            java.util.logging.Logger.getLogger(FiskalizacijaService.class.getName())
-                .log(java.util.logging.Level.INFO,
-                     "Can not initialize the default wsdl from {0}", "file:./FiskalizacijaService.wsdl");
-        }
-        WSDL_LOCATION = url;
+        WSDL_LOCATION = FiskalizacijaService.class.getClassLoader().getResource("wsdl/FiskalizacijaService.wsdl");
     }
 
     public FiskalizacijaService(URL wsdlLocation) {

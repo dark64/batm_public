@@ -4,12 +4,8 @@ package com.generalbytes.batm.server.extensions.extra.fiscalization.cis.org.w3._
 import java.util.ArrayList;
 import java.util.List;
 import javax.xml.bind.JAXBElement;
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAnyElement;
-import javax.xml.bind.annotation.XmlElementRef;
-import javax.xml.bind.annotation.XmlElementRefs;
-import javax.xml.bind.annotation.XmlType;
+import javax.xml.bind.annotation.*;
+
 import org.w3c.dom.Element;
 
 
@@ -39,12 +35,15 @@ import org.w3c.dom.Element;
  *
  *
  */
+@XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "X509DataType", propOrder = {
-    "x509IssuerSerialOrX509SKIOrX509SubjectName"
+    "x509Certificate",
+    "x509IssuerSerial"
 })
 public class X509DataType {
 
+    /*
     @XmlElementRefs({
         @XmlElementRef(name = "X509IssuerSerial", namespace = "http://www.w3.org/2000/09/xmldsig#", type = JAXBElement.class, required = false),
         @XmlElementRef(name = "X509SKI", namespace = "http://www.w3.org/2000/09/xmldsig#", type = JAXBElement.class, required = false),
@@ -54,6 +53,29 @@ public class X509DataType {
     })
     @XmlAnyElement(lax = true)
     protected List<Object> x509IssuerSerialOrX509SKIOrX509SubjectName;
+    */
+
+    @XmlElement(name = "X509Certificate", required = true)
+    protected String x509Certificate;
+
+    @XmlElement(name = "X509IssuerSerial", required = true)
+    protected X509IssuerSerialType x509IssuerSerial;
+
+    public String getX509Certificate() {
+        return x509Certificate;
+    }
+
+    public void setX509Certificate(String x509Certificate) {
+        this.x509Certificate = x509Certificate;
+    }
+
+    public X509IssuerSerialType getX509IssuerSerial() {
+        return x509IssuerSerial;
+    }
+
+    public void setX509IssuerSerial(X509IssuerSerialType x509IssuerSerial) {
+        this.x509IssuerSerial = x509IssuerSerial;
+    }
 
     /**
      * Gets the value of the x509IssuerSerialOrX509SKIOrX509SubjectName property.
@@ -83,11 +105,12 @@ public class X509DataType {
      *
      *
      */
+    /*
     public List<Object> getX509IssuerSerialOrX509SKIOrX509SubjectName() {
         if (x509IssuerSerialOrX509SKIOrX509SubjectName == null) {
             x509IssuerSerialOrX509SKIOrX509SubjectName = new ArrayList<Object>();
         }
         return this.x509IssuerSerialOrX509SKIOrX509SubjectName;
     }
-
+    */
 }

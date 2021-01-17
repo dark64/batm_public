@@ -33,8 +33,8 @@ import java.util.stream.Collectors;
  * FISC_OIB - oib firme
  * FISC_OPP - oznaka poslovnog prostora
  * FISC_ONU - oznaka naplatnog uređaja
- * FISC_JKS_PATH - putanja do FINA digitalnog certifikata (npr. /root/key.jks)
- * FISC_JKS_PASSWORD - lozinka certifikata
+ * FISC_PKCS12_PATH - putanja do digitalnog certifikata (npr. /root/FISKAL_1.p12)
+ * FISC_PKCS12_PASSWORD - lozinka certifikata
  */
 public class FiscalizationExtension extends AbstractExtension implements ITransactionListener {
     Logger log = LoggerFactory.getLogger(FiscalizationExtension.class);
@@ -47,8 +47,6 @@ public class FiscalizationExtension extends AbstractExtension implements ITransa
         super.init(ctx);
         ctx.addTransactionListener(this);
         _service = new FiskalizacijaService();
-        // System.setProperty("javax.net.ssl.keyStore", System.getenv("FISC_JKS_PATH"));
-        // System.setProperty("javax.net.ssl.keyStorePassword", System.getenv("FISC_JKS_PASSWORD"));
     }
 
     @Override
@@ -89,7 +87,7 @@ public class FiscalizationExtension extends AbstractExtension implements ITransa
                 oznPosPr = System.getenv("FISC_OPP");
                 oznNapUr = System.getenv("FISC_ONU");
             }});
-            invoice.setDatVrijeme(new SimpleDateFormat("dd.MM.yyyy HH:mm:ss").format(new Date()));
+            invoice.setDatVrijeme(new SimpleDateFormat("dd.MM.yyyy'T'HH:mm:ss").format(new Date()));
             invoice.setIznosUkupno(transactionDetails.getCashAmount().setScale(2, BigDecimal.ROUND_HALF_UP).toPlainString());
             invoice.setNacinPlac(NacinPlacanjaType.G);
             invoice.setNakDost(false);
@@ -98,11 +96,12 @@ public class FiscalizationExtension extends AbstractExtension implements ITransa
             invoice.setOznSlijed(OznakaSlijednostiType.N);
             invoice.setUSustPdv(false);
 
-            String keyPath = System.getenv("FISC_JKS_PATH");
-            char[] password = System.getenv("FISC_JKS_PASSWORD").toCharArray();
+            String pkcs12Path = System.getenv("FISC_PKCS12_PATH");
+            char[] pkcs12Password = System.getenv("FISC_PKCS12_PASSWORD").toCharArray();
 
-            KeyStore keyStore = getKeyStore(keyPath, password);
-            KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry)keyStore.getEntry("alias", new KeyStore.PasswordProtection(password));
+            KeyStore keyStore = getKeyStore(pkcs12Path, pkcs12Password);
+            KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry) keyStore.getEntry("cn=fiskal 1",
+                new KeyStore.PasswordProtection(pkcs12Password));
             String zki = generateZki(invoice, privateKeyEntry.getPrivateKey());
             invoice.setZastKod(zki);
 
@@ -110,7 +109,7 @@ public class FiscalizationExtension extends AbstractExtension implements ITransa
                 racun = invoice;
                 zaglavlje = new ZaglavljeType() {{
                     idPoruke = UUID.randomUUID().toString();
-                    datumVrijeme = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss").format(new Date());
+                    datumVrijeme = new SimpleDateFormat("dd.MM.yyyy'T'HH:mm:ss").format(new Date());
                 }};
             }};
 
@@ -164,9 +163,8 @@ public class FiscalizationExtension extends AbstractExtension implements ITransa
             byte[] signed = signature.sign();
             MessageDigest md = MessageDigest.getInstance("MD5");
             md.update(signed);
-            return DatatypeConverter.printHexBinary(signed).toLowerCase();
-        }
-        catch (Exception e) {
+            return DatatypeConverter.printHexBinary(md.digest()).toLowerCase();
+        } catch (Exception e) {
             e.printStackTrace();
             return "N/A";
         }
@@ -177,27 +175,28 @@ public class FiscalizationExtension extends AbstractExtension implements ITransa
         request.setId(RacunZahtjev.class.getSimpleName());
 
         DOMResult res = new DOMResult();
-        JAXBContext context = JAXBContext.newInstance(request.getClass());
+        JAXBContext context = JAXBContext.newInstance(RacunZahtjev.class);
         context.createMarshaller().marshal(request, res);
-        Document doc = (Document)res.getNode();
+        Document doc = (Document) res.getNode();
+        doc.getDocumentElement().setIdAttribute("Id", true);
 
         XMLSignatureFactory fac = XMLSignatureFactory.getInstance("DOM");
-        CanonicalizationMethod canonicalizationMethod = fac.newCanonicalizationMethod(CanonicalizationMethod.EXCLUSIVE, (C14NMethodParameterSpec)null);
-        SignatureMethod signatureMethod = fac.newSignatureMethod(SignatureMethod.RSA_SHA1,null);
+        CanonicalizationMethod canonicalizationMethod = fac.newCanonicalizationMethod(CanonicalizationMethod.EXCLUSIVE, (C14NMethodParameterSpec) null);
+        SignatureMethod signatureMethod = fac.newSignatureMethod(SignatureMethod.RSA_SHA1, null);
         DigestMethod digestMethod = fac.newDigestMethod(DigestMethod.SHA1, null);
 
         ArrayList<Transform> transformList = new ArrayList<>();
-        Transform envTransform = fac.newTransform("http://www.w3.org/2001/10/xml-exc-c14n#", (TransformParameterSpec)null);
-        Transform exc14nTransform = fac.newTransform(Transform.ENVELOPED, (TransformParameterSpec)null);
+        Transform envTransform = fac.newTransform("http://www.w3.org/2001/10/xml-exc-c14n#", (TransformParameterSpec) null);
+        Transform exc14nTransform = fac.newTransform(Transform.ENVELOPED, (TransformParameterSpec) null);
         transformList.add(envTransform);
         transformList.add(exc14nTransform);
 
-        Reference ref = fac.newReference("#" + request.getId(), digestMethod, transformList,null,null);
+        Reference ref = fac.newReference("#" + request.getId(), digestMethod, transformList, null, null);
         ArrayList<Reference> refList = new ArrayList<>();
         refList.add(ref);
         SignedInfo signedInfo = fac.newSignedInfo(canonicalizationMethod, signatureMethod, refList);
 
-        X509Certificate certificate = (X509Certificate)privateKeyEntry.getCertificate();
+        X509Certificate certificate = (X509Certificate) privateKeyEntry.getCertificate();
         KeyInfoFactory keyInfoFactory = fac.getKeyInfoFactory();
 
         List<Object> x509Content = new ArrayList<>();
@@ -213,24 +212,32 @@ public class FiscalizationExtension extends AbstractExtension implements ITransa
         signature.sign(signContext);
 
         SignedInfoType signedInfoType = new SignedInfoType();
-        signedInfoType.setCanonicalizationMethod(new CanonicalizationMethodType() {{ algorithm = signedInfo.getCanonicalizationMethod().getAlgorithm(); }});
-        signedInfoType.setSignatureMethod(new SignatureMethodType() {{ algorithm = signedInfo.getSignatureMethod().getAlgorithm(); }});
+        signedInfoType.setCanonicalizationMethod(new CanonicalizationMethodType() {{
+            algorithm = signedInfo.getCanonicalizationMethod().getAlgorithm();
+        }});
+        signedInfoType.setSignatureMethod(new SignatureMethodType() {{
+            algorithm = signedInfo.getSignatureMethod().getAlgorithm();
+        }});
 
-        List<ReferenceType> referenceTypes = (List<ReferenceType>)signedInfo.getReferences()
+        List<ReferenceType> referenceTypes = (List<ReferenceType>) signedInfo.getReferences()
             .stream()
             .map(r -> {
-                Reference reference = (Reference)r;
+                Reference reference = (Reference) r;
                 ReferenceType referenceType = new ReferenceType();
                 referenceType.setURI(reference.getURI());
 
                 TransformsType transformsType = new TransformsType();
-                transformsType.getTransform().addAll((Collection<? extends TransformType>)reference.getTransforms().stream().map(t -> {
-                    Transform transform = (Transform)t;
-                    return new TransformType() {{ algorithm = transform.getAlgorithm(); }};
+                transformsType.getTransform().addAll((Collection<? extends TransformType>) reference.getTransforms().stream().map(t -> {
+                    Transform transform = (Transform) t;
+                    return new TransformType() {{
+                        algorithm = transform.getAlgorithm();
+                    }};
                 }).collect(Collectors.toList()));
 
                 referenceType.setTransforms(transformsType);
-                referenceType.setDigestMethod(new DigestMethodType() {{ algorithm = reference.getDigestMethod().getAlgorithm(); }});
+                referenceType.setDigestMethod(new DigestMethodType() {{
+                    algorithm = reference.getDigestMethod().getAlgorithm();
+                }});
                 referenceType.setDigestValue(reference.getDigestValue());
                 return referenceType;
             })
@@ -239,15 +246,17 @@ public class FiscalizationExtension extends AbstractExtension implements ITransa
 
         SignatureType signatureType = new SignatureType();
         signatureType.setSignedInfo(signedInfoType);
-        signatureType.setSignatureValue(new SignatureValueType() {{ value = signature.getSignatureValue().getValue(); }});
+        signatureType.setSignatureValue(new SignatureValueType() {{
+            value = signature.getSignatureValue().getValue();
+        }});
 
         X509DataType x509DataType = new X509DataType();
         X509IssuerSerialType x509IssuerSerialType = new X509IssuerSerialType();
         x509IssuerSerialType.setX509IssuerName(certificate.getIssuerX500Principal().getName());
-        x509IssuerSerialType.setX509SerialNumber(certificate.getSerialNumber());
+        x509IssuerSerialType.setX509SerialNumber(certificate.getSerialNumber().toString());
 
-        x509DataType.getX509IssuerSerialOrX509SKIOrX509SubjectName().add(x509IssuerSerialType);
-        x509DataType.getX509IssuerSerialOrX509SKIOrX509SubjectName().add(certificate.getSignature());
+        x509DataType.setX509Certificate(Base64.getEncoder().encodeToString(certificate.getSignature()));
+        x509DataType.setX509IssuerSerial(x509IssuerSerialType);
 
         KeyInfoType keyInfoType = new KeyInfoType();
         keyInfoType.getContent().add(x509DataType);
@@ -259,7 +268,7 @@ public class FiscalizationExtension extends AbstractExtension implements ITransa
 
     private KeyStore getKeyStore(String path, char[] password) throws Exception {
         FileInputStream fileInputStream = new FileInputStream(path);
-        KeyStore keyStore = KeyStore.getInstance("JKS");
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
         keyStore.load(fileInputStream, password);
         return keyStore;
     }
